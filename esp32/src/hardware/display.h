@@ -52,21 +52,23 @@ public:
             cfg.pin_hsync = 39;
             cfg.pin_pclk = 42;
 
+            // From datasheet, doesn't actually work
             cfg.hsync_front_porch = 210;
             cfg.hsync_pulse_width = 30;
             cfg.hsync_back_porch = 16;
-
             cfg.vsync_front_porch = 22;
             cfg.vsync_pulse_width = 13;
             cfg.vsync_back_porch = 10;
 
-            cfg.hsync_front_porch = 40;
-            cfg.hsync_pulse_width = 48;
-            cfg.hsync_back_porch = 40;
-
+            // What actually works
+            cfg.hsync_front_porch = 8;
+            cfg.hsync_pulse_width = 2;
+            cfg.hsync_back_porch = 43;
             cfg.vsync_front_porch = 13;
-            cfg.vsync_pulse_width = 3;
-            cfg.vsync_back_porch = 32;
+            cfg.vsync_pulse_width = 2;
+            cfg.vsync_back_porch = 12;
+
+            cfg.freq_write = 12000000;
 
             cfg.panel = &_panel;
 
@@ -101,6 +103,24 @@ public:
         }
 
         setPanel(&_panel);
+    }
+
+    uint8_t setSmallFont()
+    {
+        setFont(&fonts::DejaVu18);
+        return 18;
+    }
+
+    uint8_t setMediumFont()
+    {
+        setFont(&fonts::DejaVu40);
+        return 40;
+    }
+
+    uint8_t setLargeFont()
+    {
+        setFont(&fonts::DejaVu72);
+        return 72;
     }
 };
 
