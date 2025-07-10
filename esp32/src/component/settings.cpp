@@ -1,3 +1,6 @@
+#include <vector>
+#include "hardware/display.h"
+#include "hardware/nfc.h"
 #include "settings.h"
 #include "button.h"
 #include "keypad.h"
@@ -22,17 +25,17 @@ void Settings::show()
 
         char playerCountText[4];
         sprintf(playerCountText, "%u", game->getPlayerCount());
-        Button menuPlayers = createMenuItem(PLAYERS_TEXT, playerCountText, menuY);
+        Button menuPlayers = createMenuItem(PLAYERS_TEXT, playerCountText, 0, menuY);
 
         char startingBalanceText[128];
         dtostrf((float)game->getStartingBalance() / DECIMAL_OFFSET_FACTOR, 1, game->getDecimalPlaces(), startingBalanceText);
-        Button menuStartingBalance = createMenuItem(STARTING_BALANCE_TEXT, startingBalanceText, menuY += buttonHeight);
+        Button menuStartingBalance = createMenuItem(STARTING_BALANCE_TEXT, startingBalanceText, 0, menuY += buttonHeight);
 
         char decimalPlacesText[4];
         sprintf(decimalPlacesText, "%u", game->getDecimalPlaces());
-        Button menuDecimalPlaces = createMenuItem(DECIMAL_PLACES_TEXT, decimalPlacesText, menuY += buttonHeight);
+        Button menuDecimalPlaces = createMenuItem(DECIMAL_PLACES_TEXT, decimalPlacesText, 0, menuY += buttonHeight);
 
-        Button menuOverdraftHandling = createMenuItem(OVERDRAFT_HANDLING_TEXT, getOverdraftHandlingText(), menuY += buttonHeight);
+        Button menuOverdraftHandling = createMenuItem(OVERDRAFT_HANDLING_TEXT, getOverdraftHandlingText(), 0, menuY += buttonHeight);
 
         Button buttonOk = Button(nullptr, OK_TEXT, nullptr, nullptr, nullptr, 0, SCREEN_WIDTH - buttonHeight, SCREEN_HEIGHT / 2 - 1, buttonHeight, BUTTON_COLOR, true, false);
         Button buttonReset = Button(nullptr, RESET_ALL_TEXT, nullptr, nullptr, nullptr, SCREEN_HEIGHT / 2, SCREEN_WIDTH - buttonHeight, SCREEN_HEIGHT / 2, buttonHeight, TFT_RED, true, false);
@@ -113,18 +116,16 @@ void Settings::showPlayersMenu()
         gfx.setTextColor(TFT_WHITE);
         gfx.print(PLAYERS_TEXT);
 
-        gfx.setSmallFont();
-        for (uint8_t i = 0; i < game->getPlayerCount(); i++)
+        std::vector<Button> buttons;
+        char playerNames[MAX_PLAYERS][16];
+        char playerBalances[MAX_PLAYERS][128];
+
+        for (uint8_t i = 0; i < MAX_PLAYERS; i++)
         {
-            gfx.setCursor(PADDING, menuY + PADDING);
-            gfx.print(i);
-
-            char playerBalanceText[128];
-            dtostrf((float)game->getPlayerBalance(i) / DECIMAL_OFFSET_FACTOR, 1, game->getDecimalPlaces(), playerBalanceText);
-
-            gfx.setCursor(SCREEN_HEIGHT - PADDING - gfx.textWidth(playerBalanceText), menuY + PADDING);
-            gfx.print(playerBalanceText);
-
+            dtostrf((float)game->getPlayerBalance(i) / DECIMAL_OFFSET_FACTOR, 1, game->getDecimalPlaces(), playerBalances[i]);
+            sprintf(playerNames[i], "Player %d", i + 1);
+            buttons.push_back(createMenuItem(playerNames[i], playerBalances[i], PADDING / 2, menuY));
+            gfx.fillRect(0, menuY, PADDING / 2, buttonHeight, game->getPlayerColor(i));
             menuY += buttonHeight;
         }
 
@@ -132,15 +133,31 @@ void Settings::showPlayersMenu()
         Button buttonResetBalances = Button(nullptr, RESET_BALANCES_TEXT, nullptr, nullptr, nullptr, SCREEN_HEIGHT / 2, SCREEN_WIDTH - buttonHeight * 2 - 1, SCREEN_HEIGHT / 2, buttonHeight, BUTTON_COLOR, true, false);
         Button buttonOk = Button(nullptr, OK_TEXT, nullptr, nullptr, nullptr, 0, SCREEN_WIDTH - buttonHeight, SCREEN_HEIGHT, buttonHeight, BUTTON_COLOR, true, false);
 
+        uint8_t playerCount = game->getPlayerCount();
+
         while (true)
         {
             lgfx::touch_point_t touchPoint;
             gfx.getTouch(&touchPoint);
 
+            bool playerButtonPressed = false;
+            for (uint8_t i = 0; i < playerCount; i++)
+            {
+                if (buttons[i].tick(touchPoint.x, touchPoint.y))
+                {
+                    game->setPlayerColor(i, showPlayerColorMenu(game->getPlayerColor(i)));
+                    playerButtonPressed = true;
+                    break;
+                }
+            }
+            if (playerButtonPressed)
+            {
+                break;
+            }
+
             if (buttonAddPlayer.tick(touchPoint.x, touchPoint.y))
             {
-                const uint8_t id[] = {0x12, 0x34};
-                game->addPlayer(id, 2, TFT_DARKGRAY);
+                showAddPlayerMenu();
                 break;
             }
 
@@ -154,6 +171,61 @@ void Settings::showPlayersMenu()
             }
 
             if (buttonOk.tick(touchPoint.x, touchPoint.y))
+            {
+                return;
+            }
+        }
+    }
+}
+
+void Settings::showAddPlayerMenu()
+{
+    uint16_t color = TFT_DARKGRAY;
+
+    while (true)
+    {
+        gfx.fillScreen(TFT_BLACK);
+        gfx.drawBitmap(SCREEN_HEIGHT / 2 - ICON_SIZE_LARGE / 2, SCREEN_WIDTH / 2 - ICON_SIZE_LARGE, iconLargeScan, ICON_SIZE_LARGE, ICON_SIZE_LARGE, color);
+
+        uint8_t textHeightMedium = gfx.setMediumFont();
+        gfx.setCursor(SCREEN_HEIGHT / 2 - gfx.textWidth(ADD_PLAYER_TEXT) / 2, SCREEN_WIDTH / 2);
+        gfx.setTextColor(TFT_WHITE);
+        gfx.print(ADD_PLAYER_TEXT);
+
+        gfx.setSmallFont();
+        gfx.setCursor(SCREEN_HEIGHT / 2 - gfx.textWidth(ADD_PLAYER_TEXT_1) / 2, SCREEN_WIDTH / 2 + textHeightMedium);
+        gfx.setTextColor(TFT_DARKGRAY);
+        gfx.print(ADD_PLAYER_TEXT_1);
+
+        Button buttonSetPlayerColor = Button(nullptr, PLAYER_COLOR_TEXT, nullptr, nullptr, nullptr, 0, SCREEN_WIDTH - buttonHeight, SCREEN_HEIGHT / 2 - 1, buttonHeight, BUTTON_COLOR, true, false);
+        Button buttonCancel = Button(nullptr, CANCEL_TEXT, nullptr, nullptr, nullptr, SCREEN_HEIGHT / 2, SCREEN_WIDTH - buttonHeight, SCREEN_HEIGHT / 2, buttonHeight, BUTTON_COLOR, true, false);
+
+        while (true)
+        {
+            uint8_t nfcId[7]; // Max 7 bytes
+            uint8_t length;   // 4 or 7 bytes depending on tag type
+            if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, nfcId, &length, 50))
+            {
+                delay(50);
+                game->addPlayer(nfcId, length, color);
+                ledcWriteTone(0, 740);
+                ledcWrite(0, 0x7F);
+                delay(200);
+                ledcWrite(0, 0);
+                delay(50);
+                return;
+            }
+
+            lgfx::touch_point_t touchPoint;
+            gfx.getTouch(&touchPoint);
+
+            if (buttonSetPlayerColor.tick(touchPoint.x, touchPoint.y))
+            {
+                color = showPlayerColorMenu(color);
+                break;
+            }
+
+            if (buttonCancel.tick(touchPoint.x, touchPoint.y))
             {
                 return;
             }
@@ -285,6 +357,53 @@ OverdraftHandling Settings::showOverdraftHandlingMenu()
     }
 }
 
+uint16_t Settings::showPlayerColorMenu(uint16_t existingColor)
+{
+    gfx.fillScreen(TFT_BLACK);
+
+    uint16_t menuY = gfx.setMediumFont() + PADDING * 2;
+    gfx.setCursor(PADDING, PADDING);
+    gfx.setTextColor(TFT_WHITE);
+    gfx.print(PLAYER_COLOR_TEXT);
+
+    uint16_t buttonSize = SCREEN_HEIGHT / 4;
+    uint16_t buttonSizePadded = buttonSize - KEYPAD_PADDING * 2;
+    std::vector<Button> buttons;
+    const uint16_t playerColors[] = {TFT_RED, TFT_MAROON, TFT_BROWN, TFT_ORANGE, TFT_YELLOW, TFT_GREENYELLOW, TFT_GREEN, TFT_DARKGREEN, TFT_CYAN, TFT_SKYBLUE, TFT_BLUE, TFT_PURPLE, TFT_MAGENTA, TFT_PINK, TFT_WHITE, TFT_DARKGRAY};
+    const size_t playerColorsCount = sizeof(playerColors) / sizeof(playerColors[0]);
+
+    for (uint8_t i = 0; i < playerColorsCount; i++)
+    {
+        uint16_t color = playerColors[i];
+        buttons.push_back(createIconButton(color == existingColor ? iconCheck : nullptr, (i % 4) * buttonSize + KEYPAD_PADDING, menuY, buttonSizePadded, buttonSizePadded, color));
+        if (i % 4 == 3)
+        {
+            menuY += buttonSize;
+        }
+    }
+
+    Button buttonCancel = Button(nullptr, CANCEL_TEXT, nullptr, nullptr, nullptr, 0, SCREEN_WIDTH - buttonHeight, SCREEN_HEIGHT, buttonHeight, BUTTON_COLOR, true, false);
+
+    while (true)
+    {
+        lgfx::touch_point_t touchPoint;
+        gfx.getTouch(&touchPoint);
+
+        for (size_t i = 0; i < playerColorsCount; i++)
+        {
+            if (buttons[i].tick(touchPoint.x, touchPoint.y))
+            {
+                return playerColors[i];
+            }
+        }
+
+        if (buttonCancel.tick(touchPoint.x, touchPoint.y))
+        {
+            return existingColor;
+        }
+    }
+}
+
 bool Settings::showResetConfirmation()
 {
     gfx.fillScreen(TFT_BLACK);
@@ -334,9 +453,9 @@ const char *Settings::getOverdraftHandlingText()
     }
 }
 
-Button Settings::createMenuItem(const char *labelLeft, const char *labelRight, uint16_t y)
+Button Settings::createMenuItem(const char *labelLeft, const char *labelRight, uint16_t x, uint16_t y)
 {
-    return Button(labelLeft, nullptr, labelRight, nullptr, nullptr, 0, y, SCREEN_HEIGHT, buttonHeight, TFT_BLACK, true, true);
+    return Button(labelLeft, nullptr, labelRight, nullptr, nullptr, x, y, SCREEN_HEIGHT - x, buttonHeight, TFT_BLACK, true, true);
 }
 
 Button Settings::createMenuItemIcon(const char *labelLeft, const uint8_t *iconRight, uint16_t y)
@@ -344,7 +463,7 @@ Button Settings::createMenuItemIcon(const char *labelLeft, const uint8_t *iconRi
     return Button(labelLeft, nullptr, nullptr, nullptr, iconRight, 0, y, SCREEN_HEIGHT, buttonHeight, TFT_BLACK, true, true);
 }
 
-Button Settings::createIconButton(const uint8_t *icon, uint16_t y)
+Button Settings::createIconButton(const uint8_t *icon, uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t color)
 {
-    return Button(nullptr, nullptr, nullptr, icon, nullptr, SCREEN_HEIGHT - buttonHeight, y, buttonHeight, buttonHeight, TFT_BLACK, true, true);
+    return Button(nullptr, nullptr, nullptr, icon, nullptr, x, y, width, height, color, true, false);
 }

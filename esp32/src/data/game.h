@@ -38,6 +38,8 @@ public:
 	void addPlayer(const uint8_t *nfcId, uint8_t length, uint16_t color);
 	uint8_t getPlayerCount();
 	int32_t getPlayerBalance(uint8_t index);
+	uint16_t getPlayerColor(uint8_t index);
+	void setPlayerColor(uint8_t index, uint16_t color);
 	void resetPlayerBalances();
 	TransactionStatus performTransaction(const uint8_t *nfcId, uint8_t length, int32_t amount);
 

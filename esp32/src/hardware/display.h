@@ -124,4 +124,11 @@ public:
     }
 };
 
+class LGFX_Sprite_New : public lgfx::LGFX_Sprite
+{
+public:
+    LGFX_Sprite_New(LGFX *parent) : lgfx::LGFX_Sprite(parent) {}
+};
+
 extern LGFX gfx;
+extern LGFX_Sprite_New sprite;

@@ -1,3 +1,9 @@
+#define CLK_PIN 13
+#define MISO_PIN 12
+#define MOSI_PIN 11
+#define CS_NFC_PIN 17
+#define AUDIO_PIN 18
+
 #define MAX_PLAYERS 10
 
 #define PADDING 16
@@ -57,3 +63,7 @@
 #define OVERDRAFT_HANDLING_1_TEXT "Block"
 #define OVERDRAFT_HANDLING_2_TEXT "Set To Zero"
 #define OVERDRAFT_HANDLING_3_TEXT "Allow"
+
+// Add player screen
+#define ADD_PLAYER_TEXT_1 "Scan tag to add player."
+#define PLAYER_COLOR_TEXT "Player Colour"

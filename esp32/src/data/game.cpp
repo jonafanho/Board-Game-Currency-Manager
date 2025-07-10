@@ -104,6 +104,17 @@ int32_t Game::getPlayerBalance(uint8_t index)
     return dataObject[SCHEMA_KEY_PLAYERS][index][SCHEMA_KEY_PLAYER_BALANCE];
 }
 
+uint16_t Game::getPlayerColor(uint8_t index)
+{
+    return dataObject[SCHEMA_KEY_PLAYERS][index][SCHEMA_KEY_PLAYER_COLOR];
+}
+
+void Game::setPlayerColor(uint8_t index, uint16_t color)
+{
+    dataObject[SCHEMA_KEY_PLAYERS][index][SCHEMA_KEY_PLAYER_COLOR] = color;
+    saveData();
+}
+
 void Game::resetPlayerBalances()
 {
     for (uint8_t i = 0; i < getPlayerCount(); i++)
